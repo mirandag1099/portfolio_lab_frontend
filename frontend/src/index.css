@@ -1,0 +1,403 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 220 25% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 25% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 25% 10%;
+
+    --primary: 220 90% 56%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 25% 10%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 10% 46%;
+
+    --accent: 0 0% 9%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 220 90% 56%;
+
+    --radius: 1rem;
+
+    --success: 142 76% 36%;
+    --success-muted: 142 60% 95%;
+    --warning: 38 92% 50%;
+    --warning-muted: 38 92% 95%;
+    --info: 220 90% 56%;
+    --info-muted: 220 100% 96%;
+
+    --chart-1: 220 90% 56%;
+    --chart-2: 142 76% 36%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 0 84% 60%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(220 90% 56%), hsl(240 90% 66%));
+    --gradient-hero: radial-gradient(ellipse 80% 50% at 50% -20%, hsl(220 90% 56% / 0.15), transparent);
+    --gradient-card: linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(220 20% 99%) 100%);
+    --gradient-mesh: radial-gradient(at 40% 20%, hsl(220 90% 56% / 0.08) 0px, transparent 50%),
+                     radial-gradient(at 80% 0%, hsl(280 65% 60% / 0.06) 0px, transparent 50%),
+                     radial-gradient(at 0% 50%, hsl(142 76% 36% / 0.05) 0px, transparent 50%);
+
+    --shadow-sm: 0 1px 2px 0 hsl(220 25% 10% / 0.03);
+    --shadow-md: 0 4px 6px -1px hsl(220 25% 10% / 0.05), 0 2px 4px -2px hsl(220 25% 10% / 0.05);
+    --shadow-lg: 0 10px 15px -3px hsl(220 25% 10% / 0.08), 0 4px 6px -4px hsl(220 25% 10% / 0.05);
+    --shadow-xl: 0 25px 50px -12px hsl(220 25% 10% / 0.15);
+    --shadow-glow: 0 0 60px hsl(220 90% 56% / 0.2);
+
+    --sidebar-background: 0 0% 99%;
+    --sidebar-foreground: 220 25% 25%;
+    --sidebar-primary: 220 90% 56%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 96%;
+    --sidebar-accent-foreground: 220 25% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 220 90% 56%;
+  }
+
+  .dark {
+    --background: 220 20% 6%;
+    --foreground: 0 0% 98%;
+
+    --card: 220 20% 9%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 220 20% 9%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 220 90% 60%;
+    --primary-foreground: 220 20% 6%;
+
+    --secondary: 220 20% 14%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 220 20% 14%;
+    --muted-foreground: 220 15% 55%;
+
+    --accent: 0 0% 98%;
+    --accent-foreground: 220 20% 6%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 20% 18%;
+    --input: 220 20% 18%;
+    --ring: 220 90% 60%;
+
+    --success: 142 70% 45%;
+    --success-muted: 142 50% 12%;
+    --warning: 38 92% 50%;
+    --warning-muted: 38 40% 12%;
+    --info: 220 90% 60%;
+    --info-muted: 220 50% 12%;
+
+    --chart-1: 220 90% 60%;
+    --chart-2: 142 70% 45%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 0 62% 50%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(220 90% 60%), hsl(240 90% 70%));
+    --gradient-hero: radial-gradient(ellipse 80% 50% at 50% -20%, hsl(220 90% 60% / 0.2), transparent);
+    --gradient-card: linear-gradient(135deg, hsl(220 20% 9%) 0%, hsl(220 20% 12%) 100%);
+    --gradient-mesh: radial-gradient(at 40% 20%, hsl(220 90% 60% / 0.12) 0px, transparent 50%),
+                     radial-gradient(at 80% 0%, hsl(280 65% 60% / 0.1) 0px, transparent 50%),
+                     radial-gradient(at 0% 50%, hsl(142 70% 45% / 0.08) 0px, transparent 50%);
+
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.3);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.4), 0 2px 4px -2px hsl(0 0% 0% / 0.3);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.5), 0 4px 6px -4px hsl(0 0% 0% / 0.4);
+    --shadow-xl: 0 25px 50px -12px hsl(0 0% 0% / 0.6);
+    --shadow-glow: 0 0 80px hsl(220 90% 60% / 0.3);
+
+    --sidebar-background: 220 20% 8%;
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 220 90% 60%;
+    --sidebar-primary-foreground: 220 20% 6%;
+    --sidebar-accent: 220 20% 14%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 220 20% 16%;
+    --sidebar-ring: 220 90% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  /* Subtle glass */
+  .glass {
+    @apply bg-card/80 backdrop-blur-lg border border-border/60;
+  }
+
+  /* Modern gradient text */
+  .gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-primary);
+  }
+
+  /* Mesh gradient background - subtle */
+  .mesh-gradient {
+    background-image: var(--gradient-mesh);
+  }
+
+  /* Hero gradient overlay */
+  .hero-gradient {
+    background: var(--gradient-hero);
+  }
+
+  /* Card styles - professional, minimal hover */
+  .card-elevated {
+    @apply bg-card rounded-xl border border-border;
+  }
+
+  .card-interactive {
+    @apply card-elevated cursor-pointer transition-colors duration-200;
+  }
+
+  .card-interactive:hover {
+    @apply border-primary/40 bg-card/90;
+  }
+
+  /* Stat cards */
+  .stat-card {
+    @apply bg-card rounded-xl border border-border p-5;
+  }
+
+  /* Modern input focus */
+  .input-modern {
+    @apply bg-muted/50 border-0 rounded-lg transition-all duration-200;
+  }
+
+  .input-modern:focus {
+    @apply bg-muted ring-2 ring-primary/20;
+  }
+
+  /* Navigation */
+  .nav-link {
+    @apply text-muted-foreground hover:text-foreground transition-colors duration-200;
+  }
+
+  .nav-link-active {
+    @apply text-foreground font-medium;
+  }
+
+  /* Data display */
+  .data-table {
+    @apply w-full text-sm;
+  }
+
+  .data-table th {
+    @apply text-left text-xs text-muted-foreground font-medium py-3 px-3 border-b border-border uppercase tracking-wider;
+  }
+
+  .data-table td {
+    @apply py-3 px-3 border-b border-border/50;
+  }
+
+  .data-table tr:hover td {
+    @apply bg-muted/20;
+  }
+
+  /* Value indicators */
+  .value-positive {
+    @apply text-success font-medium;
+  }
+
+  .value-negative {
+    @apply text-destructive font-medium;
+  }
+
+  .badge-positive {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-success/10 text-success;
+  }
+
+  .badge-negative {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-destructive/10 text-destructive;
+  }
+
+  /* Ticker animation */
+  .ticker-item {
+    @apply flex items-center gap-3 px-6 py-3 font-mono text-sm whitespace-nowrap;
+  }
+
+  /* Grid background */
+  .grid-bg {
+    background-image: linear-gradient(hsl(var(--border) / 0.3) 1px, transparent 1px),
+                      linear-gradient(90deg, hsl(var(--border) / 0.3) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* Dot pattern - subtle */
+  .dot-pattern {
+    background-image: radial-gradient(hsl(var(--muted-foreground) / 0.08) 1px, transparent 1px);
+    background-size: 16px 16px;
+  }
+
+  /* Tabs styling */
+  .tabs-modern {
+    @apply bg-muted/50 p-1 rounded-lg;
+  }
+
+  .tab-trigger-modern {
+    @apply data-[state=active]:bg-card data-[state=active]:shadow-sm rounded-md transition-all duration-150;
+  }
+
+  /* Period card - clean data display */
+  .period-card {
+    @apply flex flex-col p-3 rounded-lg bg-muted/20 border border-transparent;
+  }
+
+  .period-card:hover {
+    @apply bg-muted/40;
+  }
+
+  /* Upload zone */
+  .upload-zone {
+    @apply relative border-2 border-dashed border-border rounded-xl p-8 transition-colors duration-200;
+    @apply hover:border-primary/50 hover:bg-primary/5;
+  }
+
+  .upload-zone.dragging {
+    @apply border-primary bg-primary/10;
+  }
+
+  /* Efficient frontier chart styling */
+  .frontier-chart {
+    @apply rounded-xl overflow-hidden;
+  }
+
+  /* Metric row - for comparative tables */
+  .metric-row {
+    @apply flex items-center py-2 text-sm border-b border-border/30 last:border-0;
+  }
+
+  .metric-row:hover {
+    @apply bg-muted/20;
+  }
+
+  .metric-label {
+    @apply flex-1 text-muted-foreground text-xs;
+  }
+
+  .metric-value {
+    @apply w-20 text-right font-mono text-xs;
+  }
+
+  .metric-value-primary {
+    @apply w-20 text-right font-mono font-medium text-xs;
+  }
+
+  /* Section header */
+  .section-header {
+    @apply flex items-center gap-3 mb-5 pb-4 border-b border-border;
+  }
+
+  /* Comparison badge */
+  .comparison-badge {
+    @apply text-xs px-1.5 py-0.5 rounded font-mono;
+  }
+
+  .comparison-badge-positive {
+    @apply comparison-badge bg-success/10 text-success;
+  }
+
+  .comparison-badge-negative {
+    @apply comparison-badge bg-destructive/10 text-destructive;
+  }
+}
+
+@layer utilities {
+  /* Animations - subtle */
+  .animate-fade-in {
+    animation: fadeIn 0.4s ease-out forwards;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.5s ease-out forwards;
+  }
+
+  .animate-ticker {
+    animation: ticker 80s linear infinite;
+  }
+
+  .animate-ticker-reverse {
+    animation: tickerReverse 90s linear infinite;
+  }
+
+  .animate-scroll {
+    animation: scroll 30s linear infinite;
+  }
+
+  /* Stagger delays */
+  .stagger-1 { animation-delay: 0.05s; }
+  .stagger-2 { animation-delay: 0.1s; }
+  .stagger-3 { animation-delay: 0.15s; }
+  .stagger-4 { animation-delay: 0.2s; }
+  .stagger-5 { animation-delay: 0.25s; }
+
+  /* Display font */
+  .font-display {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  /* Text balance */
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes tickerReverse {
+  from { transform: translateX(-50%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
