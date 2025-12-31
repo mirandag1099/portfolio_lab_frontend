@@ -38,6 +38,10 @@ import {
 interface Holding {
   ticker: string;
   weight: number;
+  cagr?: number | null;
+  volatility?: number | null;
+  bestDay?: number | null;
+  worstDay?: number | null;
 }
 
 // Mock data generators
@@ -376,6 +380,10 @@ interface PortfolioAnalysisData {
   holdings: Array<{
     ticker: string;
     weight: number;
+    cagr?: number | null;
+    volatility?: number | null;
+    bestDay?: number | null;
+    worstDay?: number | null;
   }>;
   warnings: string[];
 }
@@ -2808,24 +2816,50 @@ const PortfolioResults = () => {
                   <tr>
                     <th>Symbol</th>
                     <th className="text-right">Weight</th>
-                    <th className="text-right">Return</th>
                     <th className="text-right">CAGR</th>
-                    <th className="text-right">Vol.</th>
+                    <th className="text-right">Volatility</th>
+                    <th className="text-right">Best Day</th>
+                    <th className="text-right">Worst Day</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {holdings.map((holding, i) => (
-                    <tr key={holding.ticker}>
-                      <td className="font-mono font-medium flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                        {holding.ticker}
+                  {displayHoldings && displayHoldings.length > 0 ? (
+                    displayHoldings.map((holding, i) => (
+                      <tr key={holding.ticker}>
+                        <td className="font-mono font-medium flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                          {holding.ticker}
+                        </td>
+                        <td className="text-right font-mono">{holding.weight?.toFixed(2) || '0.00'}%</td>
+                        <td className="text-right font-mono">
+                          {holding.cagr !== null && holding.cagr !== undefined 
+                            ? `${holding.cagr >= 0 ? '+' : ''}${holding.cagr.toFixed(2)}%`
+                            : '—'}
+                        </td>
+                        <td className="text-right font-mono">
+                          {holding.volatility !== null && holding.volatility !== undefined 
+                            ? `${holding.volatility.toFixed(2)}%`
+                            : '—'}
+                        </td>
+                        <td className="text-right font-mono text-success">
+                          {holding.bestDay !== null && holding.bestDay !== undefined 
+                            ? `+${holding.bestDay.toFixed(2)}%`
+                            : '—'}
+                        </td>
+                        <td className="text-right font-mono text-destructive">
+                          {holding.worstDay !== null && holding.worstDay !== undefined 
+                            ? `${holding.worstDay.toFixed(2)}%`
+                            : '—'}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="text-center text-muted-foreground py-4">
+                        No holdings data available
                       </td>
-                      <td className="text-right font-mono">{holding.weight}%</td>
-                      <td className="text-right font-mono text-success">+{(Math.random() * 200 + 50).toFixed(1)}%</td>
-                      <td className="text-right font-mono">{(Math.random() * 30 + 10).toFixed(1)}%</td>
-                      <td className="text-right font-mono">{(Math.random() * 20 + 15).toFixed(1)}%</td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
