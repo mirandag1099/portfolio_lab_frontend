@@ -415,12 +415,24 @@ const PortfolioResults = () => {
       const portfolioText = holdingsToCSV(holdings);
       const apiUrl = import.meta.env.VITE_PORTFOLIO_ANALYSIS_API_URL || 'http://localhost:8001';
       
+      // Get requested start date and window label from sessionStorage
+      const requestedStartDate = sessionStorage.getItem("requestedStartDate");
+      const requestedWindowLabel = sessionStorage.getItem("requestedWindowLabel");
+      
+      const requestBody: any = { portfolioText };
+      if (requestedStartDate) {
+        requestBody.requested_start_date = requestedStartDate;
+      }
+      if (requestedWindowLabel) {
+        requestBody.requested_window_label = requestedWindowLabel;
+      }
+      
       const response = await fetch(`${apiUrl}/analyze`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ portfolioText }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
