@@ -15,7 +15,7 @@ const metricDefinitions: Record<string, string> = {
   // Return Metrics
   "Final Value": "The ending portfolio value after all gains/losses over the analysis period. Assumes a starting value of $1,000 on the Start Date.",
   "Cumulative Return": "Total percentage return from start to end of the period, including reinvested dividends.",
-  "CAGR": "Compound Annual Growth Rate - the annualized rate of return that smooths out volatility.",
+  "CAGR": "Shows the portfolio's average annual growth over the selected period, calculated by compounding daily portfolio returns.",
   "Annual Return": "Average yearly return over the investment period.",
   "Return Contribution": "Each holding's percentage-point contribution to total portfolio return, calculated as the holding's weight multiplied by its return. Positive values add to performance, negative values reduce it.",
   "Monthly Return": "Average monthly return, useful for comparing shorter-term performance.",
@@ -57,7 +57,7 @@ const metricDefinitions: Record<string, string> = {
   "MTD Return": "Month-to-date return from the first of the current month.",
   "3M Return": "Return over the last 3 months.",
   "6M Return": "Return over the last 6 months.",
-  "YTD Return": "Year-to-date return from January 1st.",
+  "YTD Return": "Year-to-date return from January 1st to the last available date in the dataset.",
   "1Y Return": "Return over the last 12 months.",
   "3Y Return (ann.)": "Annualized return over the last 3 years.",
   "5Y Return (ann.)": "Annualized return over the last 5 years.",

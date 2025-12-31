@@ -3,12 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { MetricTooltip } from "@/components/ui/metric-tooltip";
+import { Tooltip as UITooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { MonteCarloEmbed } from "@/components/charts/MonteCarloEmbed";
 import { ProfessionalChart, CHART_COLORS } from "@/components/charts/ProfessionalChart";
 import { 
   ArrowLeft, Download, Share2, TrendingUp, 
   PieChart, Activity, BarChart3, LineChart as LineChartIcon, 
-  Shield, ChevronUp, FileText
+  Shield, ChevronUp, FileText, Info
 } from "lucide-react";
 import { ReportPreview } from "@/components/report/ReportPreview";
 import {
@@ -42,8 +43,8 @@ interface Holding {
 // Mock data generators
 const generateReturnsData = () => {
   const data = [];
-  let value = 10000;
-  let benchmark = 10000;
+  let value = 1000; // Start at $1,000 to match Final Value stat card
+  let benchmark = 1000; // Start at $1,000 to match Final Value stat card
   for (let i = 0; i < 60; i++) {
     const date = new Date();
     date.setMonth(date.getMonth() - (60 - i));
@@ -183,10 +184,10 @@ const sections = [
   { id: "summary", label: "Summary" },
   { id: "performance", label: "Performance" },
   { id: "risk", label: "Risk" },
+  { id: "holdings", label: "Holdings" },
   { id: "allocations", label: "Allocations" },
   { id: "montecarlo", label: "Monte Carlo" },
   { id: "frontier", label: "Frontier" },
-  { id: "holdings", label: "Holdings" },
   { id: "report", label: "Report" },
 ];
 
@@ -250,23 +251,24 @@ interface PortfolioAnalysisData {
     benchmarkTicker: string;
     riskFreeRate: number;
     lookbackYears: number;
+    effectiveStartDate?: string;
   };
   periodReturns: {
     portfolio: {
-      '1M': number;
-      '3M': number;
-      'YTD': number;
-      '1Y': number;
-      '3Y': number;
-      '5Y': number;
+      '1M': number | null;
+      '3M': number | null;
+      'YTD': number | null;
+      '1Y': number | null;
+      '3Y': number | null;
+      '5Y': number | null;
     };
     benchmark: {
-      '1M': number;
-      '3M': number;
-      'YTD': number;
-      '1Y': number;
-      '3Y': number;
-      '5Y': number;
+      '1M': number | null;
+      '3M': number | null;
+      'YTD': number | null;
+      '1Y': number | null;
+      '3Y': number | null;
+      '5Y': number | null;
     };
     annualized: boolean;
   };
@@ -277,17 +279,17 @@ interface PortfolioAnalysisData {
   }>;
   riskMetrics: {
     annualVolatility: number;
-    sharpeRatio: number;
-    sortinoRatio: number;
-    calmarRatio: number;
+    sharpeRatio: number | null;
+    sortinoRatio: number | null;
+    calmarRatio: number | null;
     beta: number;
     maxDrawdown: number;
   };
   benchmarkRiskMetrics: {
     annualVolatility: number;
-    sharpeRatio: number;
-    sortinoRatio: number;
-    calmarRatio: number;
+    sharpeRatio: number | null;
+    sortinoRatio: number | null;
+    calmarRatio: number | null;
     maxDrawdown: number;
     beta: number;
   };
@@ -386,7 +388,7 @@ const PortfolioResults = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState("summary");
   const [perfTab, setPerfTab] = useState<"cumulative" | "monthlyReturns" | "contributors" | "drawdown">("cumulative");
-  const [riskTab, setRiskTab] = useState<"drawdowns" | "rollingBeta" | "riskContributions">("drawdowns");
+  const [riskTab, setRiskTab] = useState<"drawdowns" | "rollingBeta" | "riskContributions" | "riskReturn">("drawdowns");
   const sectionRefs = useRef<{ [key: string]: HTMLElement | null }>({});
 
   // Convert holdings to CSV format for API
@@ -484,22 +486,39 @@ const PortfolioResults = () => {
     }
   };
 
-  // Transform API data to component format (with safe access)
+  // Transform API data to component format (preserving null for insufficient history)
   const periodReturns = analysisData?.periodReturns ? [
-    { period: "1M", portfolio: ((analysisData.periodReturns.portfolio?.['1M'] || 0) * 100), benchmark: ((analysisData.periodReturns.benchmark?.['1M'] || 0) * 100) },
-    { period: "3M", portfolio: ((analysisData.periodReturns.portfolio?.['3M'] || 0) * 100), benchmark: ((analysisData.periodReturns.benchmark?.['3M'] || 0) * 100) },
-    { period: "YTD", portfolio: ((analysisData.periodReturns.portfolio?.['YTD'] || 0) * 100), benchmark: ((analysisData.periodReturns.benchmark?.['YTD'] || 0) * 100) },
-    { period: "1Y", portfolio: ((analysisData.periodReturns.portfolio?.['1Y'] || 0) * 100), benchmark: ((analysisData.periodReturns.benchmark?.['1Y'] || 0) * 100) },
-    { period: "3Y", portfolio: ((analysisData.periodReturns.portfolio?.['3Y'] || 0) * 100), benchmark: ((analysisData.periodReturns.benchmark?.['3Y'] || 0) * 100) },
-    { period: "5Y", portfolio: ((analysisData.periodReturns.portfolio?.['5Y'] || 0) * 100), benchmark: ((analysisData.periodReturns.benchmark?.['5Y'] || 0) * 100) },
-  ] : [
-    { period: "1M", portfolio: 0, benchmark: 0 },
-    { period: "3M", portfolio: 0, benchmark: 0 },
-    { period: "YTD", portfolio: 0, benchmark: 0 },
-    { period: "1Y", portfolio: 0, benchmark: 0 },
-    { period: "3Y", portfolio: 0, benchmark: 0 },
-    { period: "5Y", portfolio: 0, benchmark: 0 },
-  ];
+    { 
+      period: "1M", 
+      portfolio: analysisData.periodReturns.portfolio?.['1M'] != null ? (analysisData.periodReturns.portfolio['1M'] * 100) : null, 
+      benchmark: analysisData.periodReturns.benchmark?.['1M'] != null ? (analysisData.periodReturns.benchmark['1M'] * 100) : null 
+    },
+    { 
+      period: "3M", 
+      portfolio: analysisData.periodReturns.portfolio?.['3M'] != null ? (analysisData.periodReturns.portfolio['3M'] * 100) : null, 
+      benchmark: analysisData.periodReturns.benchmark?.['3M'] != null ? (analysisData.periodReturns.benchmark['3M'] * 100) : null 
+    },
+    { 
+      period: "YTD", 
+      portfolio: analysisData.periodReturns.portfolio?.['YTD'] != null ? (analysisData.periodReturns.portfolio['YTD'] * 100) : null, 
+      benchmark: analysisData.periodReturns.benchmark?.['YTD'] != null ? (analysisData.periodReturns.benchmark['YTD'] * 100) : null 
+    },
+    { 
+      period: "1Y", 
+      portfolio: analysisData.periodReturns.portfolio?.['1Y'] != null ? (analysisData.periodReturns.portfolio['1Y'] * 100) : null, 
+      benchmark: analysisData.periodReturns.benchmark?.['1Y'] != null ? (analysisData.periodReturns.benchmark['1Y'] * 100) : null 
+    },
+    { 
+      period: "3Y", 
+      portfolio: analysisData.periodReturns.portfolio?.['3Y'] != null ? (analysisData.periodReturns.portfolio['3Y'] * 100) : null, 
+      benchmark: analysisData.periodReturns.benchmark?.['3Y'] != null ? (analysisData.periodReturns.benchmark['3Y'] * 100) : null 
+    },
+    { 
+      period: "5Y", 
+      portfolio: analysisData.periodReturns.portfolio?.['5Y'] != null ? (analysisData.periodReturns.portfolio['5Y'] * 100) : null, 
+      benchmark: analysisData.periodReturns.benchmark?.['5Y'] != null ? (analysisData.periodReturns.benchmark['5Y'] * 100) : null 
+    },
+  ] : [];
 
   // Generate performance summary narrative
   const generatePerformanceSummary = (): string => {
@@ -507,18 +526,24 @@ const PortfolioResults = () => {
       return "Performance data is not available.";
     }
 
-    // Short-term periods: 1M, 3M, YTD, 1Y (cumulative returns)
-    const shortTermPeriods = periodReturns.filter(p => ['1M', '3M', 'YTD', '1Y'].includes(p.period));
-    // Long-term periods: 3Y, 5Y (cumulative returns)
-    const longTermPeriods = periodReturns.filter(p => ['3Y', '5Y'].includes(p.period));
+    // Short-term periods: 1M, 3M, YTD, 1Y (cumulative returns) - filter out null values
+    const shortTermPeriods = periodReturns.filter(p => 
+      ['1M', '3M', 'YTD', '1Y'].includes(p.period) && 
+      p.portfolio !== null && p.benchmark !== null
+    );
+    // Long-term periods: 3Y, 5Y (cumulative returns) - filter out null values
+    const longTermPeriods = periodReturns.filter(p => 
+      ['3Y', '5Y'].includes(p.period) && 
+      p.portfolio !== null && p.benchmark !== null
+    );
 
     if (shortTermPeriods.length === 0 && longTermPeriods.length === 0) {
       return "Performance comparison data is not available.";
     }
 
     // Calculate relative returns (portfolio - benchmark) for each horizon
-    const shortTermDiffs = shortTermPeriods.map(p => p.portfolio - p.benchmark);
-    const longTermDiffs = longTermPeriods.map(p => p.portfolio - p.benchmark);
+    const shortTermDiffs = shortTermPeriods.map(p => p.portfolio! - p.benchmark!);
+    const longTermDiffs = longTermPeriods.map(p => p.portfolio! - p.benchmark!);
 
     const avgShortTermDiff = shortTermPeriods.length > 0 
       ? shortTermDiffs.reduce((sum, diff) => sum + diff, 0) / shortTermDiffs.length 
@@ -587,9 +612,11 @@ const PortfolioResults = () => {
   const finalValue5Y = 1000 * (1 + cumulativeReturn5Y / 100);
   const benchmarkFinalValue5Y = 1000 * (1 + benchmarkCumulativeReturn5Y / 100);
   
-  // Calculate CAGR (5Y) (for Summary section)
-  const cagr = analysisData?.periodReturns?.portfolio?.['5Y'] ? (analysisData.periodReturns.portfolio['5Y'] * 100) : 0;
-  const benchmarkCagr = analysisData?.periodReturns?.benchmark?.['5Y'] ? (analysisData.periodReturns.benchmark['5Y'] * 100) : 0;
+  // Calculate CAGR (5Y) (for Summary section) - use null if not available
+  const cagr5Y = analysisData?.periodReturns?.portfolio?.['5Y'];
+  const benchmarkCagr5Y = analysisData?.periodReturns?.benchmark?.['5Y'];
+  const cagr = cagr5Y != null ? (cagr5Y * 100) : null;
+  const benchmarkCagr = benchmarkCagr5Y != null ? (benchmarkCagr5Y * 100) : null;
 
   // Performance metrics - 5Y period only (using real data from API)
   const performanceMetrics = (() => {
@@ -801,7 +828,10 @@ const PortfolioResults = () => {
         }))
     : benchmarkPoint;
 
-  const formatDiff = (portfolio: number, benchmark: number) => {
+  const formatDiff = (portfolio: number | null, benchmark: number | null) => {
+    if (portfolio === null || benchmark === null) {
+      return "—";
+    }
     const diff = portfolio - benchmark;
     return diff >= 0 ? `+${diff.toFixed(2)}%` : `${diff.toFixed(2)}%`;
   };
@@ -845,16 +875,16 @@ const PortfolioResults = () => {
   const returnsData = (analysisData?.charts?.growthOf100 && analysisData.charts.growthOf100.length > 0)
     ? analysisData.charts.growthOf100.map((d: any) => ({
         date: new Date(d.date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-        portfolio: d.portfolio || 100,
-        benchmark: d.benchmark || 100,
+        portfolio: d.portfolio || 1000,
+        benchmark: d.benchmark || 1000,
       }))
     : generateReturnsData();
   
   // Drawdown data - simplified from growth data (with safe access)
   const drawdownData = (analysisData?.charts?.growthOf100 && analysisData.charts.growthOf100.length > 0) ? (() => {
     const data = [];
-    let portfolioPeak = 100;
-    let benchmarkPeak = 100;
+    let portfolioPeak = 1000; // Start at $1,000 to match the initial investment
+    let benchmarkPeak = 1000; // Start at $1,000 to match the initial investment
     for (const d of analysisData.charts.growthOf100) {
       if (d.portfolio > portfolioPeak) portfolioPeak = d.portfolio;
       if (d.benchmark > benchmarkPeak) benchmarkPeak = d.benchmark;
@@ -911,6 +941,237 @@ const PortfolioResults = () => {
         return [...negatives, ...positives];
       })()
     : [];
+
+  // Risk-Return Scatter data
+  const riskReturnScatterData = (analysisData?.charts?.riskReturnScatter && analysisData.charts.riskReturnScatter.length > 0)
+    ? analysisData.charts.riskReturnScatter.map((p: any) => ({
+        risk: (p.risk || 0) * 100, // Convert to percentage
+        return: (p.return || 0) * 100, // Convert to percentage
+        label: p.label || 'Unknown',
+      }))
+    : [];
+  
+  // Helper function to get color for each point
+  const getRiskReturnColor = (label: string): string => {
+    if (label === 'Portfolio') return 'hsl(var(--success))';
+    if (label === 'SPY') return 'hsl(280 65% 60%)';
+    if (label === 'QQQ') return 'hsl(220 90% 56%)';
+    if (label === 'AGG') return 'hsl(195 85% 55%)'; // Changed to cyan to avoid conflict with Portfolio
+    if (label === 'ACWI') return 'hsl(38 92% 50%)';
+    return 'hsl(var(--muted-foreground))';
+  };
+
+  // Generate Risk AI Insights (must be called after rollingVolatilityData, rollingBetaData, riskContributionsData, and riskReturnScatterData are defined)
+  const generateRiskAIInsights = () => {
+    if (!analysisData) {
+      return {
+        keyTakeaway: "Load a portfolio to see risk insights.",
+        rollingVolatility: [],
+        rollingBeta: [],
+        riskContributions: [],
+        riskReturn: [],
+      };
+    }
+
+    // A) Key Takeaway
+    let keyTakeaway = "";
+    
+    // Get latest rolling volatility values
+    const latestVol = rollingVolatilityData.length > 0 
+      ? rollingVolatilityData[rollingVolatilityData.length - 1] 
+      : null;
+    const portfolioVol = latestVol?.portfolio ?? 0;
+    const benchmarkVol = latestVol?.benchmark ?? 0;
+    
+    // Get latest beta
+    const latestBeta = rollingBetaData.length > 0 
+      ? rollingBetaData[rollingBetaData.length - 1]?.beta ?? 1.0
+      : (analysisData.riskMetrics?.beta ?? 1.0);
+    
+    // Get portfolio and benchmark from risk-return scatter
+    const portfolioPoint = riskReturnScatterData.find((p: any) => p.label === 'Portfolio');
+    const benchmarkPoint = riskReturnScatterData.find((p: any) => p.label === (analysisData.meta?.benchmarkTicker || 'SPY'));
+    const portfolioReturn = portfolioPoint?.return ?? 0;
+    const portfolioRisk = portfolioPoint?.risk ?? 0;
+    const benchmarkReturn = benchmarkPoint?.return ?? 0;
+    const benchmarkRisk = benchmarkPoint?.risk ?? 0;
+    
+    // Build key takeaway based on rules
+    const volDiff = portfolioVol - benchmarkVol;
+    const returnDiff = portfolioReturn - benchmarkReturn;
+    const riskDiff = portfolioRisk - benchmarkRisk;
+    
+    if (Math.abs(volDiff) > 2 && latestBeta > 1.1) {
+      keyTakeaway = `Higher risk than benchmark recently (${portfolioVol.toFixed(1)}% vs ${benchmarkVol.toFixed(1)}% volatility), with above-market sensitivity (beta ${latestBeta.toFixed(2)}).`;
+    } else if (Math.abs(volDiff) <= 2 && Math.abs(latestBeta - 1.0) < 0.15) {
+      keyTakeaway = `Risk has been similar to benchmark (${portfolioVol.toFixed(1)}% volatility) with market-like sensitivity (beta ${latestBeta.toFixed(2)}).`;
+    } else if (returnDiff > 0 && riskDiff <= 2) {
+      keyTakeaway = `More efficient risk/return profile than benchmark, achieving ${returnDiff.toFixed(1)}% higher return with similar or lower risk.`;
+    } else if (volDiff < -2 && latestBeta <= 0.85) {
+      keyTakeaway = `Lower risk than benchmark (${portfolioVol.toFixed(1)}% vs ${benchmarkVol.toFixed(1)}% volatility) with below-market sensitivity (beta ${latestBeta.toFixed(2)}).`;
+    } else {
+      keyTakeaway = `Portfolio risk profile shows ${portfolioVol.toFixed(1)}% volatility with beta of ${latestBeta.toFixed(2)}, indicating ${latestBeta > 1.0 ? 'above' : latestBeta < 0.85 ? 'below' : 'market-like'} sensitivity to market movements.`;
+    }
+
+    // B) Rolling Volatility section
+    const rollingVolatilityInsights = [];
+    if (rollingVolatilityData.length > 0) {
+      // Always include description
+      rollingVolatilityInsights.push("Rolling volatility shows how 'bumpy' returns have been over time, measured as the 6-month rolling standard deviation of returns.");
+      
+      // Compare latest portfolio vs benchmark
+      const volDiffAbs = Math.abs(volDiff);
+      if (volDiffAbs > 2) {
+        if (volDiff > 0) {
+          rollingVolatilityInsights.push(`Latest portfolio volatility is ${volDiff.toFixed(1)} percentage points higher than benchmark (${portfolioVol.toFixed(1)}% vs ${benchmarkVol.toFixed(1)}%), indicating more variable returns.`);
+        } else {
+          rollingVolatilityInsights.push(`Latest portfolio volatility is ${Math.abs(volDiff).toFixed(1)} percentage points lower than benchmark (${portfolioVol.toFixed(1)}% vs ${benchmarkVol.toFixed(1)}%), indicating more stable returns.`);
+        }
+      } else {
+        rollingVolatilityInsights.push(`Latest portfolio volatility (${portfolioVol.toFixed(1)}%) is similar to benchmark (${benchmarkVol.toFixed(1)}%), suggesting comparable risk levels.`);
+      }
+      
+      // Trend statement
+      if (rollingVolatilityData.length >= 2) {
+        const earliestVol = rollingVolatilityData[0].portfolio;
+        const volChange = portfolioVol - earliestVol;
+        if (Math.abs(volChange) > 2) {
+          if (volChange > 0) {
+            rollingVolatilityInsights.push(`Volatility has been rising over the period (from ${earliestVol.toFixed(1)}% to ${portfolioVol.toFixed(1)}%), indicating increasing risk.`);
+          } else {
+            rollingVolatilityInsights.push(`Volatility has been falling over the period (from ${earliestVol.toFixed(1)}% to ${portfolioVol.toFixed(1)}%), indicating decreasing risk.`);
+          }
+        } else {
+          rollingVolatilityInsights.push(`Volatility has remained relatively stable over the 6-month period.`);
+        }
+      }
+    } else {
+      rollingVolatilityInsights.push("Rolling volatility measures the variability of returns over a rolling time window, helping assess how consistent performance has been.");
+      rollingVolatilityInsights.push("Higher volatility indicates larger price swings, which can mean both higher potential returns and higher potential losses.");
+      rollingVolatilityInsights.push("Comparing portfolio volatility to a benchmark helps understand relative risk levels over time.");
+    }
+
+    // C) Rolling Beta section
+    const rollingBetaInsights = [];
+    if (rollingBetaData.length > 0) {
+      // Always include explanation
+      rollingBetaInsights.push("Beta measures how much the portfolio tends to move with the market (SPY). A beta of 1.0 means the portfolio moves in line with the market.");
+      
+      // Interpret latest beta
+      if (latestBeta >= 1.15) {
+        rollingBetaInsights.push(`Latest beta is ${latestBeta.toFixed(2)}, indicating the portfolio is more sensitive than the market and tends to amplify market movements.`);
+      } else if (latestBeta <= 0.85) {
+        rollingBetaInsights.push(`Latest beta is ${latestBeta.toFixed(2)}, indicating the portfolio is less sensitive than the market and may provide some downside protection.`);
+      } else {
+        rollingBetaInsights.push(`Latest beta is ${latestBeta.toFixed(2)}, indicating the portfolio moves closely with the market, providing market-like exposure.`);
+      }
+      
+      // Stability check
+      if (rollingBetaData.length >= 2) {
+        const betaValues = rollingBetaData.map((d: any) => d.beta).filter((b): b is number => typeof b === 'number');
+        if (betaValues.length > 1) {
+          const mean = betaValues.reduce((a, b) => a + b, 0) / betaValues.length;
+          const variance = betaValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / betaValues.length;
+          const stdDev = Math.sqrt(variance);
+          
+          if (stdDev > 0.15) {
+            rollingBetaInsights.push(`Beta has been changing significantly over time (standard deviation ${stdDev.toFixed(2)}), suggesting the portfolio's market sensitivity is not stable.`);
+          } else {
+            rollingBetaInsights.push(`Beta has remained relatively stable over the period, indicating consistent market sensitivity.`);
+          }
+        }
+      }
+    } else {
+      rollingBetaInsights.push("Beta measures the portfolio's sensitivity to market movements relative to a benchmark (typically SPY for US markets).");
+      rollingBetaInsights.push("A beta greater than 1.0 means the portfolio tends to move more than the market, while a beta less than 1.0 means it moves less.");
+      rollingBetaInsights.push("Understanding beta helps assess how much market risk the portfolio carries and how it might perform in different market conditions.");
+    }
+
+    // D) Risk Contributions section
+    const riskContributionsInsights = [];
+    if (riskContributionsData.length > 0) {
+      // Always include explanation
+      riskContributionsInsights.push("Shows which holdings drive most of the portfolio's volatility, helping identify concentration risks.");
+      
+      // Identify top contributor and concentration
+      const sortedContribs = [...riskContributionsData].sort((a: any, b: any) => Math.abs(b.contribution) - Math.abs(a.contribution));
+      const topContrib = sortedContribs[0];
+      
+      if (Math.abs(topContrib.contribution) >= 35) {
+        riskContributionsInsights.push(`${topContrib.ticker} accounts for ${Math.abs(topContrib.contribution).toFixed(1)}% of total risk, indicating risk is concentrated in this holding.`);
+      } else {
+        riskContributionsInsights.push(`${topContrib.ticker} is the largest risk driver at ${Math.abs(topContrib.contribution).toFixed(1)}%, but risk is spread across multiple holdings.`);
+      }
+      
+      // Top 3 combined
+      const top3Sum = sortedContribs.slice(0, 3).reduce((sum: number, c: any) => sum + Math.abs(c.contribution), 0);
+      if (top3Sum >= 70) {
+        const top3Tickers = sortedContribs.slice(0, 3).map((c: any) => c.ticker).join(', ');
+        riskContributionsInsights.push(`The top 3 holdings (${top3Tickers}) explain ${top3Sum.toFixed(1)}% of total risk, indicating significant concentration.`);
+      } else {
+        riskContributionsInsights.push(`Risk is diversified across holdings, with the top 3 accounting for ${top3Sum.toFixed(1)}% of total risk.`);
+      }
+    } else {
+      riskContributionsInsights.push("Risk contributions break down how each holding contributes to the portfolio's overall volatility.");
+      riskContributionsInsights.push("Holdings with higher contributions drive more of the portfolio's risk, while diversified portfolios spread risk more evenly.");
+      riskContributionsInsights.push("Understanding risk contributions helps identify concentration and opportunities for better diversification.");
+    }
+
+    // E) Risk-Return Analysis section
+    const riskReturnInsights = [];
+    if (riskReturnScatterData.length > 0 && portfolioPoint && benchmarkPoint) {
+      // Always include explanation
+      riskReturnInsights.push("Compares return vs risk; portfolios in the upper-left (higher return, lower risk) show better efficiency than those in the lower-right.");
+      
+      // Compare portfolio vs benchmark quadrant
+      const returnAdvantage = portfolioReturn > benchmarkReturn;
+      const riskAdvantage = portfolioRisk < benchmarkRisk;
+      
+      if (returnAdvantage && riskAdvantage) {
+        riskReturnInsights.push(`Portfolio achieves better efficiency with ${(portfolioReturn - benchmarkReturn).toFixed(1)}% higher return and ${(benchmarkRisk - portfolioRisk).toFixed(1)}% lower risk than the benchmark.`);
+      } else if (returnAdvantage && !riskAdvantage) {
+        riskReturnInsights.push(`Portfolio delivers ${(portfolioReturn - benchmarkReturn).toFixed(1)}% higher return but with ${(portfolioRisk - benchmarkRisk).toFixed(1)}% higher risk, indicating higher return comes with more volatility.`);
+      } else if (!returnAdvantage && riskAdvantage) {
+        riskReturnInsights.push(`Portfolio has ${(benchmarkReturn - portfolioReturn).toFixed(1)}% lower return but ${(benchmarkRisk - portfolioRisk).toFixed(1)}% lower risk, indicating a more conservative risk/return tradeoff.`);
+      } else {
+        riskReturnInsights.push(`Portfolio shows ${(benchmarkReturn - portfolioReturn).toFixed(1)}% lower return with ${(portfolioRisk - benchmarkRisk).toFixed(1)}% higher risk, suggesting a less efficient risk/return profile.`);
+      }
+      
+      // Practical implication
+      if (!returnAdvantage && !riskAdvantage) {
+        // Worse tradeoff - suggest diversification
+        if (riskContributionsData.length > 0) {
+          const topContrib = [...riskContributionsData].sort((a: any, b: any) => Math.abs(b.contribution) - Math.abs(a.contribution))[0];
+          riskReturnInsights.push(`Consider reducing exposure to ${topContrib.ticker} (largest risk driver at ${Math.abs(topContrib.contribution).toFixed(1)}%) to improve the risk/return tradeoff.`);
+        } else {
+          riskReturnInsights.push(`Consider diversification strategies to improve the risk/return efficiency relative to the benchmark.`);
+        }
+      } else if (riskContributionsData.length > 0) {
+        const topContrib = [...riskContributionsData].sort((a: any, b: any) => Math.abs(b.contribution) - Math.abs(a.contribution))[0];
+        if (Math.abs(topContrib.contribution) >= 35) {
+          riskReturnInsights.push(`Risk profile is broadly in line with the benchmark, though concentration in ${topContrib.ticker} (${Math.abs(topContrib.contribution).toFixed(1)}% of risk) warrants monitoring.`);
+        } else {
+          riskReturnInsights.push(`Risk profile is broadly in line with the benchmark with well-diversified risk contributions.`);
+        }
+      } else {
+        riskReturnInsights.push(`Risk profile is broadly in line with the benchmark.`);
+      }
+    } else {
+      riskReturnInsights.push("The risk-return scatterplot shows how different investments compare on two key dimensions: return (vertical axis) and risk/volatility (horizontal axis).");
+      riskReturnInsights.push("Portfolios positioned in the upper-left quadrant offer the best risk-adjusted returns, while those in the lower-right have less favorable profiles.");
+      riskReturnInsights.push("Comparing your portfolio to benchmarks helps assess whether you're being adequately compensated for the risk you're taking.");
+    }
+
+    return {
+      keyTakeaway,
+      rollingVolatility: rollingVolatilityInsights,
+      rollingBeta: rollingBetaInsights,
+      riskContributions: riskContributionsInsights,
+      riskReturn: riskReturnInsights,
+    };
+  };
+
+  const riskAIInsights = generateRiskAIInsights();
 
   // YTD Contributors data (similar to returnsData and drawdownData pattern)
   const contributorsData = (analysisData?.charts?.ytdContributions && analysisData.charts.ytdContributions.length > 0) ? (() => {
@@ -1293,29 +1554,27 @@ const PortfolioResults = () => {
         {/* Summary Header */}
         <div className="bg-muted/30 rounded-lg px-4 py-3 mb-6 flex flex-wrap items-center gap-x-8 gap-y-2 text-xs">
           <div>
-            <span className="text-muted-foreground">Start Date (5Y Period)</span>
+            <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground">Start Date</span>
+              <TooltipProvider>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-xs">
+                      Calculations use a 5-year (60-month) lookback period by default, but automatically default to the latest date for which price data is available for all portfolio holdings. This ensures consistent calculations when securities have different start dates (e.g., IPOs).
+                    </p>
+                  </TooltipContent>
+                </UITooltip>
+              </TooltipProvider>
+            </div>
             <span className="block font-medium">
-              {(() => {
-                // Calculate 5-year period start date (60 months ago from today)
-                if (!analysisData?.charts?.growthOf100 || analysisData.charts.growthOf100.length === 0) {
-                  return 'N/A';
-                }
-                const today = new Date();
-                const fiveYearsAgo = new Date(today.getFullYear(), today.getMonth() - 60, today.getDate());
-                
-                // Find the closest date in growthOf100 to 60 months ago
-                let closestDate = analysisData.charts.growthOf100[0].date;
-                let minDiff = Infinity;
-                analysisData.charts.growthOf100.forEach((d) => {
-                  const date = new Date(d.date);
-                  const diff = Math.abs(date.getTime() - fiveYearsAgo.getTime());
-                  if (diff < minDiff && date <= today) {
-                    minDiff = diff;
-                    closestDate = d.date;
-                  }
-                });
-                return new Date(closestDate).toLocaleDateString();
-              })()}
+              {analysisData?.meta?.effectiveStartDate 
+                ? new Date(analysisData.meta.effectiveStartDate).toLocaleDateString()
+                : (analysisData?.charts?.growthOf100 && analysisData.charts.growthOf100.length > 0
+                  ? new Date(analysisData.charts.growthOf100[0].date).toLocaleDateString()
+                  : 'N/A')}
             </span>
           </div>
           <div>
@@ -1390,16 +1649,20 @@ const PortfolioResults = () => {
             <div className="stat-card border border-border">
               <p className="text-xs text-muted-foreground mb-1"><MetricTooltip metric="CAGR" /></p>
               <div className="flex items-center gap-2">
-                <p className="text-xl font-display font-bold">{cagr.toFixed(2)}%</p>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded ${
-                  (cagr - benchmarkCagr) >= 0 
-                    ? 'bg-success/10 text-success' 
-                    : 'bg-destructive/10 text-destructive'
-                }`}>
-                  {formatDiff(cagr, benchmarkCagr)}
-                </span>
+                <p className="text-xl font-display font-bold">{cagr !== null ? `${cagr.toFixed(2)}%` : "—"}</p>
+                {cagr !== null && benchmarkCagr !== null && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                    (cagr - benchmarkCagr) >= 0 
+                      ? 'bg-success/10 text-success' 
+                      : 'bg-destructive/10 text-destructive'
+                  }`}>
+                    {formatDiff(cagr, benchmarkCagr)}
+                  </span>
+                )}
               </div>
-              <p className="text-[10px] text-muted-foreground mt-1">Benchmark: {benchmarkCagr.toFixed(2)}%</p>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Benchmark: {benchmarkCagr !== null ? `${benchmarkCagr.toFixed(2)}%` : "—"}
+              </p>
             </div>
           </div>
         </div>
@@ -1459,46 +1722,91 @@ const PortfolioResults = () => {
             <div className="stat-card border border-border">
               <p className="text-xs text-muted-foreground mb-1"><MetricTooltip metric="Sharpe Ratio" /></p>
               <div className="flex items-center gap-2">
-                <p className="text-xl font-display font-bold">
-                  {analysisData?.riskMetrics?.sharpeRatio !== undefined && analysisData?.riskMetrics?.sharpeRatio !== null
-                    ? analysisData.riskMetrics.sharpeRatio.toFixed(2)
-                    : 'N/A'}
-                </p>
+                {analysisData?.riskMetrics?.sharpeRatio === null || analysisData?.riskMetrics?.sharpeRatio === undefined ? (
+                  <TooltipProvider>
+                    <UITooltip>
+                      <TooltipTrigger asChild>
+                        <span className="font-mono text-xl font-display font-bold text-muted-foreground cursor-help inline-flex items-center gap-1">
+                          — <Info className="h-3 w-3" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[280px] text-xs">
+                        <p>Not enough data to compute a reliable estimate.</p>
+                      </TooltipContent>
+                    </UITooltip>
+                  </TooltipProvider>
+                ) : (
+                  <p className="text-xl font-display font-bold">
+                    {analysisData?.riskMetrics?.sharpeRatio !== undefined && analysisData?.riskMetrics?.sharpeRatio !== null
+                      ? analysisData.riskMetrics.sharpeRatio.toFixed(2)
+                      : '—'}
+                  </p>
+                )}
               </div>
               <p className="text-[10px] text-muted-foreground mt-1">
                 Benchmark: {analysisData?.benchmarkRiskMetrics?.sharpeRatio !== undefined && analysisData?.benchmarkRiskMetrics?.sharpeRatio !== null
                   ? analysisData.benchmarkRiskMetrics.sharpeRatio.toFixed(2)
-                  : 'N/A'}
+                  : '—'}
               </p>
             </div>
             <div className="stat-card border border-border">
               <p className="text-xs text-muted-foreground mb-1"><MetricTooltip metric="Sortino Ratio" /></p>
               <div className="flex items-center gap-2">
-                <p className="text-xl font-display font-bold">
-                  {analysisData?.riskMetrics?.sortinoRatio !== undefined && analysisData?.riskMetrics?.sortinoRatio !== null
-                    ? analysisData.riskMetrics.sortinoRatio.toFixed(2)
-                    : 'N/A'}
-                </p>
+                {analysisData?.riskMetrics?.sortinoRatio === null || analysisData?.riskMetrics?.sortinoRatio === undefined ? (
+                  <TooltipProvider>
+                    <UITooltip>
+                      <TooltipTrigger asChild>
+                        <span className="font-mono text-xl font-display font-bold text-muted-foreground cursor-help inline-flex items-center gap-1">
+                          — <Info className="h-3 w-3" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[280px] text-xs">
+                        <p>Not enough data to compute a reliable estimate.</p>
+                      </TooltipContent>
+                    </UITooltip>
+                  </TooltipProvider>
+                ) : (
+                  <p className="text-xl font-display font-bold">
+                    {analysisData?.riskMetrics?.sortinoRatio !== undefined && analysisData?.riskMetrics?.sortinoRatio !== null
+                      ? analysisData.riskMetrics.sortinoRatio.toFixed(2)
+                      : '—'}
+                  </p>
+                )}
               </div>
               <p className="text-[10px] text-muted-foreground mt-1">
                 Benchmark: {analysisData?.benchmarkRiskMetrics?.sortinoRatio !== undefined && analysisData?.benchmarkRiskMetrics?.sortinoRatio !== null
                   ? analysisData.benchmarkRiskMetrics.sortinoRatio.toFixed(2)
-                  : 'N/A'}
+                  : '—'}
               </p>
             </div>
             <div className="stat-card border border-border">
               <p className="text-xs text-muted-foreground mb-1"><MetricTooltip metric="Calmar Ratio" /></p>
               <div className="flex items-center gap-2">
-                <p className="text-xl font-display font-bold">
-                  {analysisData?.riskMetrics?.calmarRatio !== undefined && analysisData?.riskMetrics?.calmarRatio !== null
-                    ? analysisData.riskMetrics.calmarRatio.toFixed(2)
-                    : 'N/A'}
-                </p>
+                {analysisData?.riskMetrics?.calmarRatio === null || analysisData?.riskMetrics?.calmarRatio === undefined ? (
+                  <TooltipProvider>
+                    <UITooltip>
+                      <TooltipTrigger asChild>
+                        <span className="font-mono text-xl font-display font-bold text-muted-foreground cursor-help inline-flex items-center gap-1">
+                          — <Info className="h-3 w-3" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[280px] text-xs">
+                        <p>Not enough data to compute a reliable estimate.</p>
+                      </TooltipContent>
+                    </UITooltip>
+                  </TooltipProvider>
+                ) : (
+                  <p className="text-xl font-display font-bold">
+                    {analysisData?.riskMetrics?.calmarRatio !== undefined && analysisData?.riskMetrics?.calmarRatio !== null
+                      ? analysisData.riskMetrics.calmarRatio.toFixed(2)
+                      : 'N/A'}
+                  </p>
+                )}
               </div>
               <p className="text-[10px] text-muted-foreground mt-1">
                 Benchmark: {analysisData?.benchmarkRiskMetrics?.calmarRatio !== undefined && analysisData?.benchmarkRiskMetrics?.calmarRatio !== null
                   ? analysisData.benchmarkRiskMetrics.calmarRatio.toFixed(2)
-                  : 'N/A'}
+                  : '—'}
               </p>
             </div>
           </div>
@@ -1556,19 +1864,62 @@ const PortfolioResults = () => {
 
           {/* Period Returns */}
           <div className="card-elevated p-5 lg:col-span-2">
-            <h3 className="text-sm font-medium mb-3">Period Returns vs Benchmark</h3>
+            <div className="flex items-center gap-2 mb-3">
+              <h3 className="text-sm font-medium">Period Returns vs Benchmark</h3>
+              <TooltipProvider>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3.5 h-3.5 text-muted-foreground/60 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[280px] text-xs">
+                    <p>3Y and 5Y results are annualized for comparability across different time horizons</p>
+                  </TooltipContent>
+                </UITooltip>
+              </TooltipProvider>
+            </div>
             <div className="grid grid-cols-6 gap-2">
-              {periodReturns.map((item) => (
+              {periodReturns.map((item) => {
+                const hasTooltip = ['1Y', '3Y', '5Y'].includes(item.period);
+                const periodLabel = item.period === '1Y' ? '1-year' : item.period === '3Y' ? '3-year' : item.period === '5Y' ? '5-year' : item.period;
+                
+                return (
                 <div key={item.period} className="text-center p-2 rounded-lg bg-muted/30">
                   <span className="text-[10px] text-muted-foreground uppercase block mb-1">{item.period}</span>
-                  <span className={`font-mono text-sm font-medium block ${item.portfolio >= 0 ? "text-success" : "text-destructive"}`}>
-                    {item.portfolio >= 0 ? "+" : ""}{item.portfolio.toFixed(1)}%
+                    {item.portfolio === null && hasTooltip ? (
+                      <TooltipProvider>
+                        <UITooltip>
+                          <TooltipTrigger asChild>
+                            <span className="font-mono text-sm font-medium block text-muted-foreground cursor-help inline-flex items-center justify-center gap-1">
+                              — <Info className="h-3 w-3" />
                   </span>
-                  <span className={`text-[10px] block mt-1 ${item.portfolio > item.benchmark ? "text-success" : "text-destructive"}`}>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[280px] text-xs">
+                            <p>Unavailable: Some holdings are newer than this time horizon, so a full {periodLabel} return can't be calculated.</p>
+                          </TooltipContent>
+                        </UITooltip>
+                      </TooltipProvider>
+                    ) : (
+                      <span className={`font-mono text-sm font-medium block ${
+                        item.portfolio === null 
+                          ? "text-muted-foreground" 
+                          : (item.portfolio >= 0 ? "text-success" : "text-destructive")
+                      }`}>
+                        {item.portfolio === null 
+                          ? "—" 
+                          : `${item.portfolio >= 0 ? "+" : ""}${item.portfolio.toFixed(1)}%`
+                        }
+                      </span>
+                    )}
+                    <span className={`text-[10px] block mt-1 ${
+                      item.portfolio === null || item.benchmark === null
+                        ? "text-muted-foreground"
+                        : (item.portfolio > item.benchmark ? "text-success" : "text-destructive")
+                    }`}>
                     {formatDiff(item.portfolio, item.benchmark)}
                   </span>
                 </div>
-              ))}
+                );
+              })}
             </div>
             
             {/* Performance Summary */}
@@ -1619,7 +1970,7 @@ const PortfolioResults = () => {
                     </li>
                   ))}
                 </ul>
-              </div>
+                </div>
             )}
 
             {/* Allocation */}
@@ -1634,7 +1985,7 @@ const PortfolioResults = () => {
                     </li>
                   ))}
                 </ul>
-              </div>
+            </div>
             )}
 
             {/* What to Watch */}
@@ -1726,7 +2077,18 @@ const PortfolioResults = () => {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" opacity={0.5} />
                   <XAxis dataKey="date" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} tickLine={false} axisLine={false} />
+                  <YAxis 
+                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} 
+                    tickFormatter={(v) => {
+                      if (v >= 1000) {
+                        return `$${(v/1000).toFixed(0)}k`;
+                      } else {
+                        return `$${v.toFixed(0)}`;
+                      }
+                    }} 
+                    tickLine={false} 
+                    axisLine={false} 
+                  />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "hsl(var(--card))",
@@ -1744,9 +2106,12 @@ const PortfolioResults = () => {
                                 ? 'hsl(var(--success))' 
                                 : 'hsl(280 65% 60%)';
                               const name = entry.dataKey === 'portfolio' ? 'Portfolio' : 'SPY';
+                              const roundedValue = typeof entry.value === 'number' 
+                                ? Math.round(entry.value).toLocaleString() 
+                                : entry.value;
                               return (
                                 <p key={index} style={{ color }} className="text-xs font-medium">
-                                  {name}: ${typeof entry.value === 'number' ? entry.value.toLocaleString() : entry.value}
+                                  {name}: ${roundedValue}
                                 </p>
                               );
                             })}
@@ -2052,6 +2417,7 @@ const PortfolioResults = () => {
             { id: "drawdowns", label: "Rolling Volatility" },
             { id: "rollingBeta", label: "Rolling Beta" },
             { id: "riskContributions", label: "Risk Contributions" },
+            { id: "riskReturn", label: "Risk-Return Analysis" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -2074,6 +2440,7 @@ const PortfolioResults = () => {
               {riskTab === "drawdowns" && "Rolling Volatility (6-Months)"}
               {riskTab === "rollingBeta" && "Rolling Beta (6-Months) vs SPY"}
               {riskTab === "riskContributions" && "Risk Contributions (YTD)"}
+              {riskTab === "riskReturn" && "Risk-Return Analysis (5 Years)"}
             </h3>
             {riskTab === "drawdowns" && (
             <div className="flex items-center gap-4 text-xs">
@@ -2097,9 +2464,124 @@ const PortfolioResults = () => {
                   <div className="w-4 h-0.5" style={{ backgroundColor: "hsl(280 65% 60%)" }} />
                   <span className="text-muted-foreground">Market Beta (1.0)</span>
                 </div>
-              </div>
+                </div>
+              )}
+            {riskTab === "riskReturn" && riskReturnScatterData.length > 0 && (
+              <div className="flex items-center gap-4 text-xs flex-wrap">
+                {Array.from(new Map(riskReturnScatterData.map((entry: any) => [entry.label, entry])).values()).map((entry: any, index: number) => (
+                  <div key={index} className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: getRiskReturnColor(entry.label) }} />
+                    <span className="text-muted-foreground">{entry.label}</span>
+            </div>
+                ))}
+          </div>
             )}
           </div>
+          {riskTab === "riskReturn" && riskReturnScatterData.length > 0 ? (
+            <div className="grid lg:grid-cols-3 gap-4 items-start">
+              <div className="lg:col-span-2">
+                <div className="h-[400px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ScatterChart margin={{ top: 5, right: 20, bottom: 40, left: 40 }}>
+                      <XAxis
+                        type="number"
+                        dataKey="risk"
+                        name="Risk"
+                        tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
+                        tickLine={false}
+                        axisLine={{ stroke: "hsl(var(--foreground))", strokeWidth: 2 }}
+                        label={{ value: "Annualized Volatility (%)", position: "bottom", offset: 15, fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
+                      />
+                      <YAxis
+                        type="number"
+                        dataKey="return"
+                        name="Return"
+                        tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
+                        tickLine={false}
+                        axisLine={{ stroke: "hsl(var(--foreground))", strokeWidth: 2 }}
+                        label={{ value: "Annualized Return (%)", angle: -90, position: "insideLeft", offset: 10, fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
+                      />
+                      <Tooltip
+                        cursor={{ strokeDasharray: '3 3' }}
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                          fontSize: "12px",
+                        }}
+                        formatter={(value: number, name: string) => {
+                          return [`${value.toFixed(2)}%`, name === "risk" ? "Volatility" : "Return"];
+                        }}
+                        labelFormatter={(label) => label}
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            const risk = payload.find((p: any) => p.dataKey === 'risk')?.value;
+                            const ret = payload.find((p: any) => p.dataKey === 'return')?.value;
+                            return (
+                              <div className="bg-card border border-border rounded-lg p-2 shadow-lg">
+                                <p className="text-xs font-medium text-foreground mb-1">{data.label}</p>
+                                <p className="text-xs text-muted-foreground">Volatility: {typeof risk === 'number' ? `${risk.toFixed(2)}%` : risk}</p>
+                                <p className="text-xs text-muted-foreground">Return: {typeof ret === 'number' ? `${ret.toFixed(2)}%` : ret}</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      {riskReturnScatterData.reduce((acc: any[], entry: any) => {
+                        const existingGroup = acc.find((group: any) => group.label === entry.label);
+                        if (existingGroup) {
+                          existingGroup.data.push(entry);
+                        } else {
+                          acc.push({ label: entry.label, data: [entry], color: getRiskReturnColor(entry.label) });
+                        }
+                        return acc;
+                      }, []).map((group: any, groupIndex: number) => (
+                        <Scatter 
+                          key={groupIndex}
+                          data={group.data}
+                          fill={group.color}
+                          name={group.label}
+                        >
+                          <LabelList dataKey="label" position="right" fontSize={9} fill={group.color} />
+                        </Scatter>
+                      ))}
+                    </ScatterChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              <div className="space-y-3 h-[400px] flex flex-col">
+                <h4 className="text-sm font-semibold text-foreground mb-3">Benchmark Descriptions</h4>
+                <div className="flex-1 space-y-3 overflow-y-auto">
+                {Array.from(new Map(riskReturnScatterData.map((entry: any) => [entry.label, entry])).values()).map((entry: any, index: number) => {
+                  const descriptions: { [key: string]: string } = {
+                    'Portfolio': 'Your portfolio\'s risk-return profile over the last 5 years.',
+                    'SPY': 'S&P 500 Index - A broad measure of U.S. large-cap equity performance, representing 500 of the largest publicly traded companies.',
+                    'QQQ': 'Nasdaq-100 Index - Tracks 100 of the largest non-financial companies listed on the Nasdaq, heavily weighted toward technology and growth stocks.',
+                    'AGG': 'Investment-Grade Bonds - A diversified bond index representing investment-grade U.S. bonds, typically offering lower risk and lower returns than equities.',
+                    'ACWI': 'All Country World Index - A comprehensive global equity index covering developed and emerging markets, providing worldwide market exposure.'
+                  };
+                  return (
+                    <div key={index} className="flex items-start gap-2.5">
+                      <div className="w-3 h-3 rounded-full mt-1 flex-shrink-0" style={{ backgroundColor: getRiskReturnColor(entry.label) }} />
+                      <div className="flex-1">
+                        <p className="text-xs font-medium text-foreground mb-0.5">{entry.label}</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          {descriptions[entry.label] || 'Benchmark comparison point.'}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+                </div>
+              </div>
+            </div>
+          ) : riskTab === "riskReturn" ? (
+            <div className="flex items-center justify-center h-56 text-muted-foreground text-sm">
+              No risk-return data available
+            </div>
+          ) : (
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               {riskTab === "drawdowns" && rollingVolatilityData.length > 0 ? (
@@ -2231,59 +2713,165 @@ const PortfolioResults = () => {
               ) : null}
             </ResponsiveContainer>
           </div>
+          )}
+        </div>
+
+        {/* AI Insights Card */}
+        <div className="card-elevated p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium">AI Insights</h3>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Activity className="w-4 h-4" />
+              <span>Automated Analysis</span>
+            </div>
+            </div>
+
+          {/* Key Takeaway */}
+          <div className="mb-6 p-4 bg-primary/5 rounded-lg border border-primary/20">
+            <p className="text-sm font-medium text-foreground">{riskAIInsights.keyTakeaway}</p>
+                </div>
+
+          <div className="space-y-6">
+            {/* Rolling Volatility Section */}
+            <div>
+              <h4 className="text-sm font-semibold mb-2">Rolling Volatility (6M)</h4>
+              <ul className="space-y-1.5 text-sm text-muted-foreground">
+                {riskAIInsights.rollingVolatility.map((insight, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-primary mt-1">•</span>
+                    <span>{insight}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Rolling Beta Section */}
+            <div>
+              <h4 className="text-sm font-semibold mb-2">Rolling Beta (6M)</h4>
+              <ul className="space-y-1.5 text-sm text-muted-foreground">
+                {riskAIInsights.rollingBeta.map((insight, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-primary mt-1">•</span>
+                    <span>{insight}</span>
+                  </li>
+                ))}
+              </ul>
+          </div>
+
+            {/* Risk Contributions Section */}
+            <div>
+              <h4 className="text-sm font-semibold mb-2">Risk Contributions</h4>
+              <ul className="space-y-1.5 text-sm text-muted-foreground">
+                {riskAIInsights.riskContributions.map((insight, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-primary mt-1">•</span>
+                    <span>{insight}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Risk-Return Analysis Section */}
+            <div>
+              <h4 className="text-sm font-semibold mb-2">Risk–Return Analysis</h4>
+              <ul className="space-y-1.5 text-sm text-muted-foreground">
+                {riskAIInsights.riskReturn.map((insight, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-primary mt-1">•</span>
+                    <span>{insight}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+                </div>
+        </div>
+      </section>
+
+      {/* SECTION: Holdings */}
+      <section
+        id="holdings"
+        ref={(el) => (sectionRefs.current["holdings"] = el)}
+        className="mb-12 scroll-mt-32"
+      >
+        <div className="section-header">
+          <LineChartIcon className="w-5 h-5 text-chart-3" />
+          <h2 className="text-xl font-display">Holdings & Correlation</h2>
         </div>
 
         <div className="grid lg:grid-cols-2 gap-4">
-          {/* Risk Metrics */}
+          {/* Holdings Table */}
           <div className="card-elevated p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium">Risk Metrics</h3>
-              <Button variant="ghost" size="sm" className="h-6 px-2">
-                <Download className="w-3 h-3" />
-              </Button>
-            </div>
-            <div className="flex gap-4 text-[10px] text-muted-foreground uppercase mb-2 border-b border-border pb-2">
-              <span className="flex-1">Metric</span>
-              <span className="w-20 text-right">Strategy</span>
-              <span className="w-20 text-right">SPY</span>
-            </div>
-            <div className="space-y-0">
-              {riskMetrics.map((item) => (
-                <div key={item.metric} className="metric-row">
-                  <span className="metric-label"><MetricTooltip metric={item.metric} /></span>
-                  <span className={`metric-value-primary ${item.portfolio.startsWith("-") ? "text-destructive" : ""}`}>
-                    {item.portfolio}
-                  </span>
-                  <span className={`metric-value ${item.benchmark.startsWith("-") ? "text-destructive/70" : "text-muted-foreground"}`}>
-                    {item.benchmark}
-                  </span>
-                </div>
-              ))}
+            <h3 className="text-sm font-medium mb-3">Asset Breakdown</h3>
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Symbol</th>
+                    <th className="text-right">Weight</th>
+                    <th className="text-right">Return</th>
+                    <th className="text-right">CAGR</th>
+                    <th className="text-right">Vol.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {holdings.map((holding, i) => (
+                    <tr key={holding.ticker}>
+                      <td className="font-mono font-medium flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                        {holding.ticker}
+                      </td>
+                      <td className="text-right font-mono">{holding.weight}%</td>
+                      <td className="text-right font-mono text-success">+{(Math.random() * 200 + 50).toFixed(1)}%</td>
+                      <td className="text-right font-mono">{(Math.random() * 30 + 10).toFixed(1)}%</td>
+                      <td className="text-right font-mono">{(Math.random() * 20 + 15).toFixed(1)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
 
-          {/* Benchmark Comparison */}
+          {/* Correlation Matrix */}
           <div className="card-elevated p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium">Benchmark Comparison</h3>
-              <Button variant="ghost" size="sm" className="h-6 px-2">
-                <Download className="w-3 h-3" />
-              </Button>
+            <h3 className="text-sm font-medium mb-3">Correlation Matrix</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr>
+                    <th className="p-1.5"></th>
+                    {correlationAssetsTransformed.map((asset) => (
+                      <th key={asset} className="p-1.5 text-center font-mono">{asset}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {correlationAssetsTransformed.map((row, i) => (
+                    <tr key={row}>
+                      <td className="p-1.5 font-mono font-medium">{row}</td>
+                      {correlationAssetsTransformed.map((col, j) => {
+                        const value = correlationMatrixData.length > i && correlationMatrixData[i].length > j 
+                          ? correlationMatrixData[i][j] 
+                          : (i === j ? 1 : 0);
+                        const intensity = value;
+                        return (
+                          <td
+                            key={col}
+                            className="p-1.5 text-center font-mono"
+                            style={{
+                              backgroundColor: `hsl(var(--primary) / ${intensity * 0.25})`,
+                            }}
+                          >
+                            {value.toFixed(2)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div className="flex gap-4 text-[10px] text-muted-foreground uppercase mb-2 border-b border-border pb-2">
-              <span className="flex-1">vs SPY</span>
-              <span className="w-20 text-right">Value</span>
-            </div>
-            <div className="space-y-0">
-              {benchmarkComparison.map((item) => (
-                <div key={item.metric} className="metric-row">
-                  <span className="metric-label"><MetricTooltip metric={item.metric} /></span>
-                  <span className="metric-value-primary">{item.portfolio}</span>
-                </div>
-              ))}
-            </div>
-            <p className="text-[10px] text-muted-foreground mt-4 pt-3 border-t border-border">
-              Alpha &gt; 0 indicates outperformance vs benchmark on a risk-adjusted basis
+            <p className="text-[10px] text-muted-foreground mt-3">
+              High correlations may indicate concentration risk
             </p>
           </div>
         </div>
@@ -2574,96 +3162,6 @@ const PortfolioResults = () => {
                 </Button>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* SECTION: Holdings */}
-      <section
-        id="holdings"
-        ref={(el) => (sectionRefs.current["holdings"] = el)}
-        className="mb-12 scroll-mt-32"
-      >
-        <div className="section-header">
-          <LineChartIcon className="w-5 h-5 text-chart-3" />
-          <h2 className="text-xl font-display">Holdings & Correlation</h2>
-        </div>
-
-        <div className="grid lg:grid-cols-2 gap-4">
-          {/* Holdings Table */}
-          <div className="card-elevated p-5">
-            <h3 className="text-sm font-medium mb-3">Asset Breakdown</h3>
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Symbol</th>
-                    <th className="text-right">Weight</th>
-                    <th className="text-right">Return</th>
-                    <th className="text-right">CAGR</th>
-                    <th className="text-right">Vol.</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {holdings.map((holding, i) => (
-                    <tr key={holding.ticker}>
-                      <td className="font-mono font-medium flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                        {holding.ticker}
-                      </td>
-                      <td className="text-right font-mono">{holding.weight}%</td>
-                      <td className="text-right font-mono text-success">+{(Math.random() * 200 + 50).toFixed(1)}%</td>
-                      <td className="text-right font-mono">{(Math.random() * 30 + 10).toFixed(1)}%</td>
-                      <td className="text-right font-mono">{(Math.random() * 20 + 15).toFixed(1)}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Correlation Matrix */}
-          <div className="card-elevated p-5">
-            <h3 className="text-sm font-medium mb-3">Correlation Matrix</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr>
-                    <th className="p-1.5"></th>
-                    {correlationAssetsTransformed.map((asset) => (
-                      <th key={asset} className="p-1.5 text-center font-mono">{asset}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {correlationAssetsTransformed.map((row, i) => (
-                    <tr key={row}>
-                      <td className="p-1.5 font-mono font-medium">{row}</td>
-                      {correlationAssetsTransformed.map((col, j) => {
-                        const value = correlationMatrixData.length > i && correlationMatrixData[i].length > j 
-                          ? correlationMatrixData[i][j] 
-                          : (i === j ? 1 : 0);
-                        const intensity = value;
-                        return (
-                          <td
-                            key={col}
-                            className="p-1.5 text-center font-mono"
-                            style={{
-                              backgroundColor: `hsl(var(--primary) / ${intensity * 0.25})`,
-                            }}
-                          >
-                            {value.toFixed(2)}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="text-[10px] text-muted-foreground mt-3">
-              High correlations may indicate concentration risk
-            </p>
           </div>
         </div>
       </section>
