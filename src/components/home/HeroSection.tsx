@@ -1,9 +1,16 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { Upload, ArrowRight, FileSpreadsheet, X, Play, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import Papa from "papaparse";
 import { toast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Holding {
   ticker: string;
@@ -17,6 +24,10 @@ const HeroSection = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedWindowLabel, setSelectedWindowLabel] = useState<"1Y" | "3Y" | "5Y" | "10Y" | "CUSTOM" | null>(null);
+  const [customDay, setCustomDay] = useState<number | null>(null);
+  const [customMonth, setCustomMonth] = useState<number | null>(null);
+  const [customYear, setCustomYear] = useState<number | null>(null);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -97,15 +108,136 @@ const HeroSection = () => {
     }
   };
 
+  // Get valid days for the selected month/year (accounts for leap years and month lengths)
+  const validDays = useMemo(() => {
+    if (!customMonth || !customYear) return [];
+    const daysInMonth = new Date(customYear, customMonth, 0).getDate();
+    return Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  }, [customMonth, customYear]);
+
+  // Calculate requested_start_date based on selection
+  const requestedStartDate = useMemo(() => {
+    if (!selectedWindowLabel) return null;
+
+    const today = new Date();
+    let startDate: Date;
+
+    if (selectedWindowLabel === "CUSTOM") {
+      if (!customDay || !customMonth || !customYear) return null;
+      // Use the full date with day, month, and year
+      startDate = new Date(customYear, customMonth - 1, customDay);
+      
+      // Validate the date is valid (handles invalid dates like Feb 30)
+      if (startDate.getDate() !== customDay || 
+          startDate.getMonth() !== customMonth - 1 || 
+          startDate.getFullYear() !== customYear) {
+        return null;
+      }
+    } else {
+      // Calculate based on preset
+      const years = parseInt(selectedWindowLabel.replace("Y", ""));
+      startDate = new Date(today);
+      startDate.setFullYear(today.getFullYear() - years);
+    }
+
+    return startDate.toISOString().split("T")[0]; // Return as YYYY-MM-DD
+  }, [selectedWindowLabel, customDay, customMonth, customYear]);
+
+  // Check if date selection is valid
+  const isDateSelectionValid = useMemo(() => {
+    if (!selectedWindowLabel) return false;
+    if (selectedWindowLabel === "CUSTOM") {
+      if (customDay === null || customMonth === null || customYear === null) return false;
+      
+      // Validate the date is valid and not in the future
+      const selectedDate = new Date(customYear, customMonth - 1, customDay);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Reset time for comparison
+      
+      // Check if the date is valid (handles invalid dates like Feb 30)
+      if (selectedDate.getDate() !== customDay || 
+          selectedDate.getMonth() !== customMonth - 1 || 
+          selectedDate.getFullYear() !== customYear) {
+        return false;
+      }
+      
+      // Check year is valid
+      if (customYear < 1900 || customYear > today.getFullYear()) return false;
+      
+      // Check date is not in the future
+      if (selectedDate > today) return false;
+      
+      return true;
+    }
+    return true;
+  }, [selectedWindowLabel, customDay, customMonth, customYear]);
+
   const handleRunAnalysis = () => {
+    if (!isDateSelectionValid || !requestedStartDate || !selectedWindowLabel) {
+      toast({
+        title: "Date selection required",
+        description: "Please select a date range before running the analysis.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Store holdings in sessionStorage for the results page
     sessionStorage.setItem("portfolioHoldings", JSON.stringify(holdings));
+    // Store date selection
+    sessionStorage.setItem("requestedStartDate", requestedStartDate);
+    sessionStorage.setItem("requestedWindowLabel", selectedWindowLabel);
     navigate("/dashboard/results");
+  };
+
+  const handlePresetSelect = (preset: "1Y" | "3Y" | "5Y" | "10Y") => {
+    setSelectedWindowLabel(preset);
+    setCustomDay(null);
+    setCustomMonth(null);
+    setCustomYear(null);
+  };
+
+  const handleCustomSelect = () => {
+    setSelectedWindowLabel("CUSTOM");
+    // Set default to 1 year ago if not already set
+    if (customDay === null || customMonth === null || customYear === null) {
+      const today = new Date();
+      setCustomDay(today.getDate());
+      setCustomMonth(today.getMonth() + 1); // months are 1-indexed for UI
+      setCustomYear(today.getFullYear() - 1);
+    }
+  };
+
+  // Handle month/year change - reset day if it's invalid for the new month
+  const handleMonthChange = (month: number) => {
+    setCustomMonth(month);
+    // If current day is invalid for new month, reset it
+    if (customDay && customYear) {
+      const daysInMonth = new Date(customYear, month, 0).getDate();
+      if (customDay > daysInMonth) {
+        setCustomDay(null);
+      }
+    }
+  };
+
+  const handleYearChange = (year: number) => {
+    setCustomYear(year);
+    // If current day is invalid for new month/year (e.g., Feb 29 in non-leap year), reset it
+    if (customDay && customMonth) {
+      const daysInMonth = new Date(year, customMonth, 0).getDate();
+      if (customDay > daysInMonth) {
+        setCustomDay(null);
+      }
+    }
   };
 
   const clearUpload = () => {
     setUploadedFile(null);
     setHoldings([]);
+    setSelectedWindowLabel(null);
+    setCustomDay(null);
+    setCustomMonth(null);
+    setCustomYear(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -202,18 +334,121 @@ const HeroSection = () => {
                   )}
                 </div>
 
-                {/* Run button */}
-                <Button
-                  variant="default"
-                  size="lg"
-                  className="w-full btn-glow"
-                  onClick={handleRunAnalysis}
-                  disabled={isProcessing}
-                >
-                  <Play className="w-5 h-5" />
-                  Run Full Analysis
-                  <ArrowRight className="w-5 h-5" />
-                </Button>
+                {/* Date Selection Section */}
+                <div className="space-y-4">
+                  <div className="text-left">
+                    <label className="text-sm font-medium text-foreground mb-3 block">
+                      Analysis Period
+                    </label>
+                    
+                    {/* Preset buttons */}
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {(["1Y", "3Y", "5Y", "10Y"] as const).map((preset) => (
+                        <Button
+                          key={preset}
+                          variant={selectedWindowLabel === preset ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePresetSelect(preset)}
+                          className="flex-1 min-w-[70px]"
+                        >
+                          {preset}
+                        </Button>
+                      ))}
+                      <Button
+                        variant={selectedWindowLabel === "CUSTOM" ? "default" : "outline"}
+                        size="sm"
+                        onClick={handleCustomSelect}
+                        className="flex-1 min-w-[80px]"
+                      >
+                        Custom
+                      </Button>
+                    </div>
+
+                    {/* Custom date picker */}
+                    {selectedWindowLabel === "CUSTOM" && (
+                      <div className="flex gap-2">
+                        <Select
+                          value={customMonth?.toString() || ""}
+                          onValueChange={(value) => handleMonthChange(parseInt(value))}
+                        >
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder="Month" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[
+                              "January", "February", "March", "April", "May", "June",
+                              "July", "August", "September", "October", "November", "December"
+                            ].map((month, idx) => (
+                              <SelectItem key={idx + 1} value={(idx + 1).toString()}>
+                                {month}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        <Select
+                          value={customDay?.toString() || ""}
+                          onValueChange={(value) => setCustomDay(parseInt(value))}
+                          disabled={!customMonth || !customYear}
+                        >
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder="Day" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {validDays.map((day) => (
+                              <SelectItem key={day} value={day.toString()}>
+                                {day}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        <Select
+                          value={customYear?.toString() || ""}
+                          onValueChange={(value) => handleYearChange(parseInt(value))}
+                        >
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder="Year" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from({ length: 30 }, (_, i) => {
+                              const year = new Date().getFullYear() - i;
+                              return (
+                                <SelectItem key={year} value={year.toString()}>
+                                  {year}
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {/* Display selected date range */}
+                    {isDateSelectionValid && requestedStartDate && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Analysis from {new Date(requestedStartDate).toLocaleDateString("en-US", { 
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric" 
+                        })}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Run button */}
+                  <Button
+                    variant="default"
+                    size="lg"
+                    className="w-full btn-glow"
+                    onClick={handleRunAnalysis}
+                    disabled={isProcessing || !isDateSelectionValid}
+                  >
+                    <Play className="w-5 h-5" />
+                    Run Full Analysis
+                    <ArrowRight className="w-5 h-5" />
+                  </Button>
+                </div>
               </div>
             )}
           </div>
