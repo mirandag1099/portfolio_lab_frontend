@@ -633,10 +633,13 @@ const PortfolioResults = () => {
   const benchmarkFinalValue5Y = 1000 * (1 + benchmarkCumulativeReturn5Y / 100);
   
   // Calculate CAGR (5Y) (for Summary section) - use null if not available
-  const cagr5Y = analysisData?.periodReturns?.portfolio?.['5Y'];
-  const benchmarkCagr5Y = analysisData?.periodReturns?.benchmark?.['5Y'];
-  const cagr = cagr5Y != null ? (cagr5Y * 100) : null;
-  const benchmarkCagr = benchmarkCagr5Y != null ? (benchmarkCagr5Y * 100) : null;
+  // Note: periodReturns may be decimals (0.1537 for 15.37%), but performanceMetrics5Y.cagr5Y is percentages
+  // We use performanceMetrics5Y.cagr5Y which is already percentages
+  const cagr5Y = analysisData?.performanceMetrics5Y?.cagr5Y;
+  const benchmarkCagr5Y = analysisData?.performanceMetrics5Y?.cagr5YBenchmark;
+  // Both values are already percentages from backend (e.g., 15.37 for 15.37%)
+  const cagr = cagr5Y != null ? cagr5Y : null;
+  const benchmarkCagr = benchmarkCagr5Y != null ? benchmarkCagr5Y : null;
 
   // Performance metrics - 5Y period only (using real data from API)
   const performanceMetrics = (() => {
@@ -665,19 +668,19 @@ const PortfolioResults = () => {
       { 
         metric: "CAGR (5Y)", 
         portfolio: typeof metrics5Y.cagr5Y === 'number' && !isNaN(metrics5Y.cagr5Y)
-          ? `${(metrics5Y.cagr5Y * 100).toFixed(2)}%` 
+          ? `${metrics5Y.cagr5Y.toFixed(2)}%` 
           : "N/A", 
         benchmark: typeof metrics5Y.cagr5YBenchmark === 'number' && !isNaN(metrics5Y.cagr5YBenchmark)
-          ? `${(metrics5Y.cagr5YBenchmark * 100).toFixed(2)}%` 
+          ? `${metrics5Y.cagr5YBenchmark.toFixed(2)}%` 
           : "N/A" 
       },
       { 
         metric: "Max Drawdown (5Y)", 
         portfolio: typeof metrics5Y.maxDrawdown5Y === 'number' && !isNaN(metrics5Y.maxDrawdown5Y)
-          ? `${(metrics5Y.maxDrawdown5Y * 100).toFixed(2)}%` 
+          ? `${(metrics5Y.maxDrawdown5Y || 0).toFixed(2)}%` 
           : "N/A", 
         benchmark: typeof metrics5Y.maxDrawdown5YBenchmark === 'number' && !isNaN(metrics5Y.maxDrawdown5YBenchmark)
-          ? `${(metrics5Y.maxDrawdown5YBenchmark * 100).toFixed(2)}%` 
+          ? `${(metrics5Y.maxDrawdown5YBenchmark || 0).toFixed(2)}%` 
           : "N/A" 
       },
       { 
@@ -693,8 +696,8 @@ const PortfolioResults = () => {
   })();
 
   const riskMetrics = analysisData ? [
-    { metric: "Annualized Volatility", portfolio: `${((analysisData.riskMetrics?.annualVolatility || 0) * 100).toFixed(2)}%`, benchmark: "N/A" },
-    { metric: "Max Drawdown", portfolio: `${((analysisData.riskMetrics?.maxDrawdown || 0) * 100).toFixed(2)}%`, benchmark: "N/A" },
+    { metric: "Annualized Volatility", portfolio: `${(analysisData.riskMetrics?.annualVolatility || 0).toFixed(2)}%`, benchmark: "N/A" },
+    { metric: "Max Drawdown", portfolio: `${(analysisData.riskMetrics?.maxDrawdown || 0).toFixed(2)}%`, benchmark: "N/A" },
     { metric: "Longest Drawdown", portfolio: "N/A", benchmark: "N/A" },
     { metric: "Beta", portfolio: analysisData.riskMetrics?.beta !== undefined && analysisData.riskMetrics?.beta !== null ? analysisData.riskMetrics.beta.toFixed(2) : "N/A", benchmark: analysisData.benchmarkRiskMetrics?.beta !== undefined && analysisData.benchmarkRiskMetrics?.beta !== null ? analysisData.benchmarkRiskMetrics.beta.toFixed(2) : "1.00" },
     { metric: "Value at Risk (95%)", portfolio: "N/A", benchmark: "N/A" },
@@ -782,9 +785,10 @@ const PortfolioResults = () => {
     return `hsl(${hue} ${saturation}% ${lightness}%)`;
   };
   
+  // Backend returns weights as percentages (46.0 for 46%), use directly
   const pieData = displayHoldings.map((h, i) => ({
     name: h.ticker,
-    value: Math.round(h.weight * 100), // Convert to percentage and round to whole number
+    value: Math.round(h.weight || 0), // Already a percentage, just round
     color: getColorForIndex(i), // Each holding gets a unique color
   }));
   
@@ -963,10 +967,11 @@ const PortfolioResults = () => {
     : [];
 
   // Risk-Return Scatter data
+  // Backend returns percentages (46.0 for 46%), use directly
   const riskReturnScatterData = (analysisData?.charts?.riskReturnScatter && analysisData.charts.riskReturnScatter.length > 0)
     ? analysisData.charts.riskReturnScatter.map((p: any) => ({
-        risk: (p.risk || 0) * 100, // Convert to percentage
-        return: (p.return || 0) * 100, // Convert to percentage
+        risk: (p.risk || 0), // Already a percentage
+        return: (p.return || 0), // Already a percentage
         label: p.label || 'Unknown',
       }))
     : [];
@@ -1227,10 +1232,11 @@ const PortfolioResults = () => {
     const metrics5Y = analysisData.performanceMetrics5Y;
     const portfolioCumRet = metrics5Y?.cumulativeReturn5Y ?? 0;
     const benchmarkCumRet = metrics5Y?.cumulativeReturn5YBenchmark ?? 0;
-    const portfolioCagr = metrics5Y?.cagr5Y ? metrics5Y.cagr5Y * 100 : 0;
-    const benchmarkCagr = metrics5Y?.cagr5YBenchmark ? metrics5Y.cagr5YBenchmark * 100 : 0;
-    const portfolioMaxDD = metrics5Y?.maxDrawdown5Y ? Math.abs(metrics5Y.maxDrawdown5Y * 100) : 0;
-    const benchmarkMaxDD = metrics5Y?.maxDrawdown5YBenchmark ? Math.abs(metrics5Y.maxDrawdown5YBenchmark * 100) : 0;
+    // Both values are already percentages from backend
+    const portfolioCagr = metrics5Y?.cagr5Y ? metrics5Y.cagr5Y : 0;
+    const benchmarkCagr = metrics5Y?.cagr5YBenchmark ? metrics5Y.cagr5YBenchmark : 0;
+    const portfolioMaxDD = metrics5Y?.maxDrawdown5Y ? Math.abs(metrics5Y.maxDrawdown5Y) : 0;
+    const benchmarkMaxDD = metrics5Y?.maxDrawdown5YBenchmark ? Math.abs(metrics5Y.maxDrawdown5YBenchmark) : 0;
     const cumRetDiff = portfolioCumRet - benchmarkCumRet;
     const cagrDiff = portfolioCagr - benchmarkCagr;
 
@@ -1361,12 +1367,14 @@ const PortfolioResults = () => {
     }
 
     const metrics5Y = analysisData.performanceMetrics5Y;
+    // Both CAGR values are already percentages from backend (e.g., 15.37 for 15.37%)
     const portfolioCagr5Y = metrics5Y?.cagr5Y ? metrics5Y.cagr5Y : 0;
     const benchmarkCagr5Y = metrics5Y?.cagr5YBenchmark ? metrics5Y.cagr5YBenchmark : 0;
     const portfolioSharpe3Y = analysisData.riskMetrics?.sharpeRatio ?? 0;
     const benchmarkSharpe3Y = analysisData.benchmarkRiskMetrics?.sharpeRatio ?? 0;
 
     // Headline based on 5Y CAGR and 3Y Sharpe
+    // Note: cagrDiff comparison uses percentage values directly (e.g., 15.37 vs 14.66)
     let headline = "";
     const cagrDiff = portfolioCagr5Y - benchmarkCagr5Y;
     const sharpeDiff = portfolioSharpe3Y - benchmarkSharpe3Y;
@@ -1409,9 +1417,11 @@ const PortfolioResults = () => {
     }
 
     if (typeof portfolioCagr5Y === 'number' && !isNaN(portfolioCagr5Y) && portfolioCagr5Y !== 0) {
-      const portfolioCagrPct = portfolioCagr5Y * 100;
+      // portfolioCagr5Y is already a percentage from backend (e.g., 15.37 for 15.37%)
+      const portfolioCagrPct = portfolioCagr5Y;
       if (typeof benchmarkCagr5Y === 'number' && !isNaN(benchmarkCagr5Y)) {
-        const benchmarkCagrPct = benchmarkCagr5Y * 100;
+        // benchmarkCagr5Y is already a percentage from backend
+        const benchmarkCagrPct = benchmarkCagr5Y;
         const cagrDiff5Y = portfolioCagrPct - benchmarkCagrPct;
         insights.returns.push(`Annualized return over 5 years is ${portfolioCagrPct.toFixed(2)}%${Math.abs(cagrDiff5Y) > 1 ? `, ${cagrDiff5Y > 0 ? 'above' : 'below'} the benchmark's ${benchmarkCagrPct.toFixed(2)}%` : ''}.`);
       } else {
@@ -1420,21 +1430,23 @@ const PortfolioResults = () => {
     }
 
     // Risk insights (3Y)
+    // Both volatility values are already percentages from backend (e.g., 16.55 for 16.55%)
     const portfolioVol3Y = analysisData.riskMetrics?.annualVolatility;
     const benchmarkVol3Y = analysisData.benchmarkRiskMetrics?.annualVolatility;
     if (typeof portfolioVol3Y === 'number' && !isNaN(portfolioVol3Y) && typeof benchmarkVol3Y === 'number' && !isNaN(benchmarkVol3Y)) {
       const volDiff = portfolioVol3Y - benchmarkVol3Y;
       if (Math.abs(volDiff) > 0.01) {
-        insights.risk.push(`Volatility over the past 3 years is ${(portfolioVol3Y * 100).toFixed(1)}%${volDiff > 0 ? ', higher' : ', lower'} than the benchmark's ${(benchmarkVol3Y * 100).toFixed(1)}%, indicating ${volDiff > 0 ? 'more' : 'less'} price fluctuation.`);
+        insights.risk.push(`Volatility over the past 3 years is ${portfolioVol3Y.toFixed(1)}%${volDiff > 0 ? ', higher' : ', lower'} than the benchmark's ${benchmarkVol3Y.toFixed(1)}%, indicating ${volDiff > 0 ? 'more' : 'less'} price fluctuation.`);
       }
     }
 
+    // Both max drawdown values are already percentages from backend (e.g., 29.73 for 29.73%)
     const portfolioMaxDD3Y = analysisData.riskMetrics?.maxDrawdown;
     const benchmarkMaxDD3Y = analysisData.benchmarkRiskMetrics?.maxDrawdown;
     if (typeof portfolioMaxDD3Y === 'number' && !isNaN(portfolioMaxDD3Y) && typeof benchmarkMaxDD3Y === 'number' && !isNaN(benchmarkMaxDD3Y)) {
       const ddDiff = Math.abs(portfolioMaxDD3Y) - Math.abs(benchmarkMaxDD3Y);
       if (Math.abs(ddDiff) > 0.01) {
-        insights.risk.push(`Maximum decline from peak over 3 years reached ${(Math.abs(portfolioMaxDD3Y) * 100).toFixed(1)}%${ddDiff > 0 ? ', more' : ', less'} than the benchmark's ${(Math.abs(benchmarkMaxDD3Y) * 100).toFixed(1)}%.`);
+        insights.risk.push(`Maximum decline from peak over 3 years reached ${Math.abs(portfolioMaxDD3Y).toFixed(1)}%${ddDiff > 0 ? ', more' : ', less'} than the benchmark's ${Math.abs(benchmarkMaxDD3Y).toFixed(1)}%.`);
       }
     }
 
@@ -1464,11 +1476,12 @@ const PortfolioResults = () => {
       if (sortedHoldings.length > 0) {
         const topTickers = sortedHoldings.slice(0, Math.min(3, sortedHoldings.length)).map(h => h.ticker);
         if (topTickers.length === 1) {
-          insights.allocation.push(`${topTickers[0]} represents ${(topHolding.weight * 100).toFixed(1)}% of the portfolio.`);
+          // Backend returns weights as percentages (46.0 for 46%), use directly
+          insights.allocation.push(`${topTickers[0]} represents ${(topHolding.weight || 0).toFixed(1)}% of the portfolio.`);
         } else if (topTickers.length === 2) {
-          insights.allocation.push(`Top holdings are ${topTickers[0]} (${(sortedHoldings[0].weight * 100).toFixed(1)}%) and ${topTickers[1]} (${(sortedHoldings[1].weight * 100).toFixed(1)}%).`);
+          insights.allocation.push(`Top holdings are ${topTickers[0]} (${(sortedHoldings[0].weight || 0).toFixed(1)}%) and ${topTickers[1]} (${(sortedHoldings[1].weight || 0).toFixed(1)}%).`);
         } else {
-          insights.allocation.push(`Top holdings are ${topTickers[0]} (${(sortedHoldings[0].weight * 100).toFixed(1)}%), ${topTickers[1]} (${(sortedHoldings[1].weight * 100).toFixed(1)}%), and ${topTickers[2]} (${(sortedHoldings[2].weight * 100).toFixed(1)}%).`);
+          insights.allocation.push(`Top holdings are ${topTickers[0]} (${(sortedHoldings[0].weight || 0).toFixed(1)}%), ${topTickers[1]} (${(sortedHoldings[1].weight || 0).toFixed(1)}%), and ${topTickers[2]} (${(sortedHoldings[2].weight || 0).toFixed(1)}%).`);
         }
       }
 
@@ -1696,12 +1709,12 @@ const PortfolioResults = () => {
               <p className="text-xs text-muted-foreground mb-1"><MetricTooltip metric="Annualized Volatility" /></p>
               <div className="flex items-center gap-2">
                 <p className="text-xl font-display font-bold">
-                  {analysisData?.riskMetrics?.annualVolatility ? `${(analysisData.riskMetrics.annualVolatility * 100).toFixed(2)}%` : 'N/A'}
+                  {analysisData?.riskMetrics?.annualVolatility ? `${(analysisData.riskMetrics.annualVolatility).toFixed(2)}%` : 'N/A'}
                 </p>
               </div>
               <p className="text-[10px] text-muted-foreground mt-1">
                 Benchmark: {analysisData?.benchmarkRiskMetrics?.annualVolatility !== undefined && analysisData?.benchmarkRiskMetrics?.annualVolatility !== null
-                  ? `${(analysisData.benchmarkRiskMetrics.annualVolatility * 100).toFixed(2)}%`
+                  ? `${(analysisData.benchmarkRiskMetrics.annualVolatility).toFixed(2)}%`
                   : 'N/A'}
               </p>
             </div>
@@ -1709,12 +1722,12 @@ const PortfolioResults = () => {
               <p className="text-xs text-muted-foreground mb-1"><MetricTooltip metric="Max Drawdown" /></p>
               <div className="flex items-center gap-2">
                 <p className="text-xl font-display font-bold text-destructive">
-                  {analysisData?.riskMetrics?.maxDrawdown ? `${(analysisData.riskMetrics.maxDrawdown * 100).toFixed(2)}%` : 'N/A'}
+                  {analysisData?.riskMetrics?.maxDrawdown ? `${(analysisData.riskMetrics.maxDrawdown).toFixed(2)}%` : 'N/A'}
                 </p>
               </div>
               <p className="text-[10px] text-muted-foreground mt-1">
                 Benchmark: {analysisData?.benchmarkRiskMetrics?.maxDrawdown !== undefined && analysisData?.benchmarkRiskMetrics?.maxDrawdown !== null
-                  ? `${(analysisData.benchmarkRiskMetrics.maxDrawdown * 100).toFixed(2)}%`
+                  ? `${(analysisData.benchmarkRiskMetrics.maxDrawdown).toFixed(2)}%`
                   : 'N/A'}
               </p>
             </div>
